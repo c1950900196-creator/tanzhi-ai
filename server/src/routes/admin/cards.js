@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const db = require('../../db');
+const { db } = require('../../db');
 const adminAuth = require('../../middleware/admin');
 const { generateCards } = require('../../services/cardGenerator');
 const { fetchZhihuHot, processZhihuToCards } = require('../../services/zhihuCrawler');
@@ -34,14 +34,14 @@ router.post('/fetch-zhihu', adminAuth, async (req, res) => {
   }
 });
 
-router.get('/cards-stats', adminAuth, (req, res) => {
-  const byRole = db.prepare('SELECT target_role, count(*) as count FROM cards GROUP BY target_role').all();
-  const bySource = db.prepare("SELECT COALESCE(source,'ai_generated') as source, count(*) as count FROM cards GROUP BY source").all();
-  const total = db.prepare('SELECT count(*) as count FROM cards').get();
+router.get('/cards-stats', adminAuth, async (req, res) => {
+  const byRole = await db.all('SELECT target_role, count(*) as count FROM cards GROUP BY target_role');
+  const bySource = await db.all("SELECT COALESCE(source,'ai_generated') as source, count(*) as count FROM cards GROUP BY source");
+  const total = await db.get('SELECT count(*) as count FROM cards');
   res.json({ total: total.count, byRole, bySource });
 });
 
-router.get('/cards', adminAuth, (req, res) => {
+router.get('/cards', adminAuth, async (req, res) => {
   const page = Math.max(1, parseInt(req.query.page) || 1);
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
   const offset = (page - 1) * limit;
@@ -53,8 +53,8 @@ router.get('/cards', adminAuth, (req, res) => {
   else if (source === 'ai_generated') { where += " AND (source = 'ai_generated' OR source IS NULL)"; }
   if (role) { where += ' AND target_role = ?'; params.push(role); }
 
-  const total = db.prepare(`SELECT count(*) as c FROM cards WHERE ${where}`).get(...params).c;
-  const cards = db.prepare(`SELECT * FROM cards WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`).all(...params, limit, offset);
+  const total = await db.get(`SELECT count(*) as c FROM cards WHERE ${where}`, ...params);
+  const cards = await db.all(`SELECT * FROM cards WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, ...params, limit, offset);
 
   res.json({
     cards: cards.map(c => ({
@@ -64,16 +64,16 @@ router.get('/cards', adminAuth, (req, res) => {
       author_name: c.author_name, author_title: c.author_title,
       created_at: c.created_at
     })),
-    pagination: { page, limit, total, totalPages: Math.ceil(total / limit) }
+    pagination: { page, limit, total: total.c, totalPages: Math.ceil(total.c / limit) }
   });
 });
 
-router.delete('/cards/:id', adminAuth, (req, res) => {
+router.delete('/cards/:id', adminAuth, async (req, res) => {
   const id = parseInt(req.params.id);
-  const card = db.prepare('SELECT id, title FROM cards WHERE id = ?').get(id);
+  const card = await db.get('SELECT id, title FROM cards WHERE id = ?', id);
   if (!card) return res.status(404).json({ error: '卡片不存在' });
-  db.prepare('DELETE FROM card_events WHERE card_id = ?').run(id);
-  db.prepare('DELETE FROM cards WHERE id = ?').run(id);
+  await db.run('DELETE FROM card_events WHERE card_id = ?', id);
+  await db.run('DELETE FROM cards WHERE id = ?', id);
   res.json({ ok: true, deleted: card.title });
 });
 

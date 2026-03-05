@@ -1,9 +1,9 @@
-const db = require('../db');
+const { db } = require('../db');
 const { callDoubao, getEmbedding, getEmbeddingsBatch, parseJsonResponse } = require('./doubao');
 const { cosineSimilarity } = require('../utils/embedding');
 
-function findSimilarTagsFromEmbedding(queryEmb, topK = 5, threshold = 0.65) {
-  const allTags = db.prepare('SELECT id, name, category, embedding, usage_count FROM tag_library WHERE embedding IS NOT NULL').all();
+async function findSimilarTagsFromEmbedding(queryEmb, topK = 5, threshold = 0.65) {
+  const allTags = await db.all('SELECT id, name, category, embedding, usage_count FROM tag_library WHERE embedding IS NOT NULL');
   const scored = [];
   for (const tag of allTags) {
     try {
@@ -19,16 +19,16 @@ function findSimilarTagsFromEmbedding(queryEmb, topK = 5, threshold = 0.65) {
 async function ensureTagInLibrary(tagName) {
   const clean = tagName.replace(/^#/, '').trim();
   if (!clean) return;
-  const existing = db.prepare('SELECT id FROM tag_library WHERE name = ?').get(clean);
+  const existing = await db.get('SELECT id FROM tag_library WHERE name = ?', clean);
   if (existing) {
-    db.prepare('UPDATE tag_library SET usage_count = usage_count + 1 WHERE id = ?').run(existing.id);
+    await db.run('UPDATE tag_library SET usage_count = usage_count + 1 WHERE id = ?', existing.id);
     return;
   }
   try {
     const emb = await getEmbedding(clean);
-    db.prepare('INSERT OR IGNORE INTO tag_library (name, embedding) VALUES (?, ?)').run(clean, JSON.stringify(emb));
+    await db.run('INSERT IGNORE INTO tag_library (name, embedding) VALUES (?, ?)', clean, JSON.stringify(emb));
   } catch (e) {
-    db.prepare('INSERT OR IGNORE INTO tag_library (name) VALUES (?)').run(clean);
+    await db.run('INSERT IGNORE INTO tag_library (name) VALUES (?)', clean);
     console.warn(`[标签] Embedding 失败 (${clean}):`, e.message);
   }
 }
@@ -36,17 +36,17 @@ async function ensureTagInLibrary(tagName) {
 async function smartTag(title) {
   try {
     const titleEmb = await getEmbedding(title);
-    const similar = findSimilarTagsFromEmbedding(titleEmb, 5, 0.55);
+    const similar = await findSimilarTagsFromEmbedding(titleEmb, 5, 0.55);
 
     if (similar.length >= 2) {
       const picked = similar.slice(0, 3);
       for (const t of picked) {
-        db.prepare('UPDATE tag_library SET usage_count = usage_count + 1 WHERE id = ?').run(t.id);
+        await db.run('UPDATE tag_library SET usage_count = usage_count + 1 WHERE id = ?', t.id);
       }
       return picked.map(t => '#' + t.name);
     }
 
-    const existingNames = db.prepare('SELECT name FROM tag_library ORDER BY usage_count DESC LIMIT 50').all().map(r => r.name);
+    const existingNames = (await db.all('SELECT name FROM tag_library ORDER BY usage_count DESC LIMIT 50')).map(r => r.name);
     const libText = existingNames.length > 0 ? `已有标签库：${existingNames.join('、')}` : '';
 
     const prompt = `为以下标题打2-3个标签。${libText ? '\n' + libText + '\n优先使用已有标签，没有合适的则新建（2-4字）。' : '创建2-3个简洁标签（2-4字）。'}
@@ -78,10 +78,10 @@ async function smartTagBatch(titles) {
 
     const needAi = [];
     for (let i = 0; i < titles.length; i++) {
-      const similar = findSimilarTagsFromEmbedding(embeddings[i], 5, 0.55);
+      const similar = await findSimilarTagsFromEmbedding(embeddings[i], 5, 0.55);
       if (similar.length >= 2) {
         const picked = similar.slice(0, 3);
-        for (const t of picked) db.prepare('UPDATE tag_library SET usage_count = usage_count + 1 WHERE id = ?').run(t.id);
+        for (const t of picked) await db.run('UPDATE tag_library SET usage_count = usage_count + 1 WHERE id = ?', t.id);
         results[i] = picked.map(t => '#' + t.name);
       } else {
         needAi.push({ idx: i, title: titles[i], partial: similar.map(t => t.name) });
@@ -89,7 +89,7 @@ async function smartTagBatch(titles) {
     }
 
     if (needAi.length > 0) {
-      const existingNames = db.prepare('SELECT name FROM tag_library ORDER BY usage_count DESC LIMIT 50').all().map(r => r.name);
+      const existingNames = (await db.all('SELECT name FROM tag_library ORDER BY usage_count DESC LIMIT 50')).map(r => r.name);
       const libText = existingNames.length > 0 ? `已有标签库（优先匹配）：${existingNames.join('、')}` : '';
       const titlesText = needAi.map((n, j) => `${j + 1}. ${n.title}`).join('\n');
 
@@ -126,7 +126,7 @@ ${titlesText}
     console.warn('[smartTagBatch] Embedding 失败，全量回退 AI:', e.message);
     const fallback = {};
     try {
-      const existingNames = db.prepare('SELECT name FROM tag_library ORDER BY usage_count DESC LIMIT 50').all().map(r => r.name);
+      const existingNames = (await db.all('SELECT name FROM tag_library ORDER BY usage_count DESC LIMIT 50')).map(r => r.name);
       const libText = existingNames.length > 0 ? `已有标签库：${existingNames.join('、')}` : '';
       const titlesText = titles.map((t, i) => `${i + 1}. ${t}`).join('\n');
       const content = await callDoubao([

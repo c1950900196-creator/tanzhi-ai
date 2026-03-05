@@ -1,13 +1,13 @@
-const db = require('../db');
+const { db } = require('../db');
 const { callDoubao, parseJsonResponse } = require('./doubao');
 const { GRADIENTS, AUTHOR_COLORS, HEATS } = require('../utils/constants');
 
-function insertCards(parsed, targetRole, source) {
-  const insertStmt = db.prepare(`INSERT INTO cards (target_role, tags, heat, title, summary, gradient, author_name, author_avatar, author_color, author_title, ai_first_message, quick_replies, source) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+async function insertCards(parsed, targetRole, source) {
   const results = [];
   for (let i = 0; i < parsed.length; i++) {
     const c = parsed[i];
-    const result = insertStmt.run(
+    const result = await db.run(
+      `INSERT INTO cards (target_role, tags, heat, title, summary, gradient, author_name, author_avatar, author_color, author_title, ai_first_message, quick_replies, source) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       targetRole, JSON.stringify(c.tags || []), HEATS[i % HEATS.length],
       c.title, c.summary, GRADIENTS[i % GRADIENTS.length],
       c.author_name, c.author_name[0], AUTHOR_COLORS[i % AUTHOR_COLORS.length],
@@ -53,7 +53,7 @@ async function generateCards(targetRole, topics) {
   ], 0.9);
 
   const parsed = parseJsonResponse(content);
-  return insertCards(parsed, targetRole, 'ai_generated');
+  return await insertCards(parsed, targetRole, 'ai_generated');
 }
 
 module.exports = { insertCards, generateCards };

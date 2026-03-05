@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const db = require('../../db');
+const { db } = require('../../db');
 const adminAuth = require('../../middleware/admin');
 const { getEmbedding } = require('../../services/doubao');
 const { cosineSimilarity } = require('../../utils/embedding');
@@ -9,11 +9,11 @@ const router = Router();
 
 router.post('/', adminAuth, async (req, res) => {
   try {
-    const { text, threshold = 0.4, topK = 10 } = req.body;
+    const { text, topK = 10 } = req.body;
     if (!text) return res.status(400).json({ error: '请输入测试文本' });
 
     const queryEmb = await getEmbedding(text);
-    const allTags = db.prepare('SELECT id, name, category, usage_count, embedding FROM tag_library WHERE embedding IS NOT NULL').all();
+    const allTags = await db.all('SELECT id, name, category, usage_count, embedding FROM tag_library WHERE embedding IS NOT NULL');
     const scored = [];
     for (const tag of allTags) {
       try {

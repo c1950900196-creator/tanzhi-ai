@@ -1,18 +1,18 @@
 const { Router } = require('express');
-const db = require('../../db');
+const { db } = require('../../db');
 const adminAuth = require('../../middleware/admin');
 
 const router = Router();
 
-router.get('/analytics', adminAuth, (req, res) => {
-  const totalViews = db.prepare("SELECT count(*) as c FROM card_events WHERE event_type = 'view'").get().c;
-  const totalClicks = db.prepare("SELECT count(*) as c FROM card_events WHERE event_type = 'click'").get().c;
+router.get('/analytics', adminAuth, async (req, res) => {
+  const totalViews = (await db.get("SELECT count(*) as c FROM card_events WHERE event_type = 'view'")).c;
+  const totalClicks = (await db.get("SELECT count(*) as c FROM card_events WHERE event_type = 'click'")).c;
 
   const bySource = {};
   for (const src of ['ai_generated', 'zhihu']) {
-    const views = db.prepare("SELECT count(*) as c FROM card_events WHERE event_type = 'view' AND source = ?").get(src).c;
-    const clicks = db.prepare("SELECT count(*) as c FROM card_events WHERE event_type = 'click' AND source = ?").get(src).c;
-    const chatEnds = db.prepare("SELECT meta FROM card_events WHERE event_type = 'chat_end' AND source = ?").all(src);
+    const views = (await db.get("SELECT count(*) as c FROM card_events WHERE event_type = 'view' AND source = ?", src)).c;
+    const clicks = (await db.get("SELECT count(*) as c FROM card_events WHERE event_type = 'click' AND source = ?", src)).c;
+    const chatEnds = await db.all("SELECT meta FROM card_events WHERE event_type = 'chat_end' AND source = ?", src);
     let totalSec = 0, totalChars = 0, chatCount = chatEnds.length;
     for (const row of chatEnds) {
       try { const m = JSON.parse(row.meta || '{}'); totalSec += m.duration_sec || 0; totalChars += m.total_chars || 0; } catch {}
@@ -35,17 +35,18 @@ router.get('/analytics', adminAuth, (req, res) => {
   });
 });
 
-router.get('/analytics/users', adminAuth, (req, res) => {
-  const users = db.prepare('SELECT id, username, role, created_at, last_active FROM users').all();
-  const result = users.map(u => {
-    const views = db.prepare("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'view'").get(u.id).c;
-    const clicks = db.prepare("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'click'").get(u.id).c;
-    const chatEnds = db.prepare("SELECT meta FROM card_events WHERE user_id = ? AND event_type = 'chat_end'").all(u.id);
+router.get('/analytics/users', adminAuth, async (req, res) => {
+  const users = await db.all('SELECT id, username, role, created_at, last_active FROM users');
+  const result = [];
+  for (const u of users) {
+    const views = (await db.get("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'view'", u.id)).c;
+    const clicks = (await db.get("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'click'", u.id)).c;
+    const chatEnds = await db.all("SELECT meta FROM card_events WHERE user_id = ? AND event_type = 'chat_end'", u.id);
     let totalSec = 0, totalChars = 0;
     for (const row of chatEnds) {
       try { const m = JSON.parse(row.meta || '{}'); totalSec += m.duration_sec || 0; totalChars += m.total_chars || 0; } catch {}
     }
-    return {
+    result.push({
       id: u.id, username: u.username, role: u.role, created_at: u.created_at, last_active: u.last_active,
       views, clicks,
       click_rate: views > 0 ? (clicks / views * 100).toFixed(1) + '%' : '0%',
@@ -53,29 +54,31 @@ router.get('/analytics/users', adminAuth, (req, res) => {
       total_chat_sec: totalSec, total_chars: totalChars,
       avg_chat_sec: chatEnds.length > 0 ? Math.round(totalSec / chatEnds.length) : 0,
       avg_chars: chatEnds.length > 0 ? Math.round(totalChars / chatEnds.length) : 0
-    };
-  });
+    });
+  }
   res.json(result);
 });
 
-router.get('/analytics/user/:id', adminAuth, (req, res) => {
+router.get('/analytics/user/:id', adminAuth, async (req, res) => {
   const userId = parseInt(req.params.id);
-  const user = db.prepare('SELECT id, username, role, tags, created_at FROM users WHERE id = ?').get(userId);
+  const user = await db.get('SELECT id, username, role, tags, created_at FROM users WHERE id = ?', userId);
   if (!user) return res.status(404).json({ error: '用户不存在' });
 
-  const views = db.prepare("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'view'").get(userId).c;
-  const clicks = db.prepare("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'click'").get(userId).c;
-  const chatEnds = db.prepare("SELECT meta FROM card_events WHERE user_id = ? AND event_type = 'chat_end'").all(userId);
+  const views = (await db.get("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'view'", userId)).c;
+  const clicks = (await db.get("SELECT count(*) as c FROM card_events WHERE user_id = ? AND event_type = 'click'", userId)).c;
+  const chatEnds = await db.all("SELECT meta FROM card_events WHERE user_id = ? AND event_type = 'chat_end'", userId);
   let totalSec = 0, totalChars = 0;
   for (const row of chatEnds) {
     try { const m = JSON.parse(row.meta || '{}'); totalSec += m.duration_sec || 0; totalChars += m.total_chars || 0; } catch {}
   }
 
-  const recentEvents = db.prepare(`
+  const recentEvents = await db.all(`
     SELECT e.event_type, e.source, e.meta, e.created_at, c.title as card_title
     FROM card_events e LEFT JOIN cards c ON e.card_id = c.id
     WHERE e.user_id = ? ORDER BY e.created_at DESC LIMIT 50
-  `).all(userId).map(r => ({
+  `, userId);
+
+  const formattedEvents = recentEvents.map(r => ({
     event_type: r.event_type, card_title: r.card_title, source: r.source,
     meta: r.meta ? JSON.parse(r.meta) : null, created_at: r.created_at
   }));
@@ -90,7 +93,7 @@ router.get('/analytics/user/:id', adminAuth, (req, res) => {
       avg_chars: chatEnds.length > 0 ? Math.round(totalChars / chatEnds.length) : 0,
       total_chat_sec: totalSec, total_chars: totalChars
     },
-    recent_events: recentEvents
+    recent_events: formattedEvents
   });
 });
 

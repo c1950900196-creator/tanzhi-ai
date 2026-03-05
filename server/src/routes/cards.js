@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const db = require('../db');
+const { db } = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { getTagEmbeddingsMap, scoreCardSemantic, getUserEmbedding, formatCard } = require('../services/recommend');
 
@@ -7,7 +7,7 @@ const router = Router();
 
 router.get('/', authMiddleware, async (req, res) => {
   try {
-    const user = db.prepare('SELECT role, tags FROM users WHERE id = ?').get(req.user.id);
+    const user = await db.get('SELECT role, tags FROM users WHERE id = ?', req.user.id);
     if (!user || !user.role) return res.status(400).json({ error: '请先完成身份设置' });
 
     const userTags = JSON.parse(user.tags || '[]');
@@ -16,9 +16,9 @@ router.get('/', authMiddleware, async (req, res) => {
     const aiCount = totalCount - zhihuCount;
 
     const userEmb = await getUserEmbedding(req.user.id, userTags);
-    const tagEmbMap = getTagEmbeddingsMap();
+    const tagEmbMap = await getTagEmbeddingsMap();
 
-    const aiCards = db.prepare("SELECT * FROM cards WHERE (source IS NULL OR source = 'ai_generated') AND target_role = ? ORDER BY created_at DESC").all(user.role);
+    const aiCards = await db.all("SELECT * FROM cards WHERE (source IS NULL OR source = 'ai_generated') AND target_role = ? ORDER BY created_at DESC", user.role);
     const scored = aiCards.map(card => ({
       ...card,
       score: userEmb ? scoreCardSemantic(card, userEmb, tagEmbMap) : 0
@@ -26,7 +26,7 @@ router.get('/', authMiddleware, async (req, res) => {
     scored.sort((a, b) => b.score - a.score);
     const pickedAi = scored.slice(0, aiCount);
 
-    const zhihuCards = db.prepare("SELECT * FROM cards WHERE source = 'zhihu' ORDER BY created_at DESC LIMIT 50").all();
+    const zhihuCards = await db.all("SELECT * FROM cards WHERE source = 'zhihu' ORDER BY created_at DESC LIMIT 50");
     const zhihuScored = zhihuCards.map(card => ({
       ...card,
       score: userEmb ? scoreCardSemantic(card, userEmb, tagEmbMap) : Math.random()

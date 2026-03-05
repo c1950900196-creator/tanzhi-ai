@@ -1,6 +1,5 @@
 const { Router } = require('express');
-const db = require('../db');
-const config = require('../config');
+const { db } = require('../db');
 const authMiddleware = require('../middleware/auth');
 const { chatLimiter } = require('../middleware/rateLimiter');
 const { streamChat } = require('../services/doubao');
@@ -12,7 +11,7 @@ router.post('/', authMiddleware, chatLimiter, async (req, res) => {
     const { messages, cardContext } = req.body;
     if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: '消息格式错误' });
 
-    const user = db.prepare('SELECT role FROM users WHERE id = ?').get(req.user.id);
+    const user = await db.get('SELECT role FROM users WHERE id = ?', req.user.id);
     const roleName = user?.role === 'developer' ? '程序员' : '产品经理';
 
     let systemPrompt = `你是"探知"AI 助手，一个面向${roleName}的认知探索伙伴。
@@ -52,7 +51,6 @@ router.post('/', authMiddleware, chatLimiter, async (req, res) => {
     res.flushHeaders();
 
     const upstream = await streamChat(apiMessages, res);
-
     const reader = upstream.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';

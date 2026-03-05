@@ -1,73 +1,78 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const mysql = require('mysql2/promise');
+const config = require('./config');
 const fs = require('fs');
+const path = require('path');
 
-const dataDir = path.join(__dirname, '..', 'data');
-if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+let pool;
 
-const db = new Database(path.join(dataDir, 'tanzhi.db'));
-db.pragma('journal_mode = WAL');
+async function initDb() {
+  pool = mysql.createPool({
+    host: config.db.host,
+    user: config.db.user,
+    password: config.db.password,
+    database: config.db.name,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+  });
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT,
-    tags TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_active DATETIME
-  )
-`);
+  const schemaPath = path.join(__dirname, '..', 'scripts', 'schema.sql');
+  if (fs.existsSync(schemaPath)) {
+    const schema = fs.readFileSync(schemaPath, 'utf-8');
+    const statements = schema
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0 && !s.startsWith('CREATE DATABASE') && !s.startsWith('USE'));
 
-try { db.exec('ALTER TABLE users ADD COLUMN last_active DATETIME'); } catch {}
-try { db.exec('ALTER TABLE users RENAME COLUMN last_login TO last_active'); } catch {}
+    for (const stmt of statements) {
+      try {
+        await pool.execute(stmt);
+      } catch (e) {
+        if (!e.message.includes('Duplicate') && !e.message.includes('already exists')) {
+          console.warn('[DB] Schema 语句跳过:', e.message.slice(0, 80));
+        }
+      }
+    }
+  }
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS cards (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    target_role TEXT NOT NULL,
-    tags TEXT NOT NULL,
-    heat TEXT NOT NULL,
-    title TEXT NOT NULL,
-    summary TEXT NOT NULL,
-    gradient TEXT NOT NULL,
-    author_name TEXT NOT NULL,
-    author_avatar TEXT NOT NULL,
-    author_color TEXT NOT NULL,
-    author_title TEXT NOT NULL,
-    ai_first_message TEXT NOT NULL,
-    quick_replies TEXT NOT NULL,
-    source TEXT DEFAULT 'ai_generated',
-    source_url TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+  console.log('[DB] MySQL 连接池已初始化');
+  return pool;
+}
 
-try { db.exec(`ALTER TABLE cards ADD COLUMN source TEXT DEFAULT 'ai_generated'`); } catch {}
-try { db.exec(`ALTER TABLE cards ADD COLUMN source_url TEXT`); } catch {}
+const db = {
+  async get(sql, ...params) {
+    const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+    const [rows] = await pool.execute(sql, flatParams);
+    return rows[0] || null;
+  },
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS card_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    card_id INTEGER NOT NULL,
-    event_type TEXT NOT NULL,
-    source TEXT,
-    meta TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+  async all(sql, ...params) {
+    const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+    const [rows] = await pool.execute(sql, flatParams);
+    return rows;
+  },
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS tag_library (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT UNIQUE NOT NULL,
-    category TEXT,
-    embedding TEXT,
-    usage_count INTEGER DEFAULT 1,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  )
-`);
+  async run(sql, ...params) {
+    const flatParams = params.length === 1 && Array.isArray(params[0]) ? params[0] : params;
+    const [result] = await pool.execute(sql, flatParams);
+    return { lastInsertRowid: result.insertId, changes: result.affectedRows };
+  },
 
-module.exports = db;
+  async exec(sql) {
+    const conn = await pool.getConnection();
+    try {
+      const statements = sql.split(';').map(s => s.trim()).filter(s => s);
+      for (const stmt of statements) {
+        await conn.execute(stmt);
+      }
+    } finally {
+      conn.release();
+    }
+  },
+
+  getPool() {
+    return pool;
+  }
+};
+
+module.exports = { initDb, db };

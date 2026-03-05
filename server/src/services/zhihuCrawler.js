@@ -1,4 +1,4 @@
-const db = require('../db');
+const { db } = require('../db');
 const { smartTagBatch } = require('./tagService');
 const { GRADIENTS, HEATS, QUICK_REPLY_TEMPLATES } = require('../utils/constants');
 
@@ -40,18 +40,15 @@ async function fetchZhihuHot() {
 }
 
 async function processZhihuToCards(items) {
-  const existingUrls = new Set(
-    db.prepare("SELECT source_url FROM cards WHERE source = 'zhihu' AND source_url IS NOT NULL").all().map(r => r.source_url)
-  );
+  const existingRows = await db.all("SELECT source_url FROM cards WHERE source = 'zhihu' AND source_url IS NOT NULL");
+  const existingUrls = new Set(existingRows.map(r => r.source_url));
   const newItems = items.filter(i => !i.url || !existingUrls.has(i.url));
   if (newItems.length === 0) return [];
 
   console.log(`[知乎] 为 ${newItems.length} 条热榜用 RAG 打标签...`);
   const tagMap = await smartTagBatch(newItems.map(i => i.title));
 
-  const insertStmt = db.prepare(`INSERT INTO cards (target_role, tags, heat, title, summary, gradient, author_name, author_avatar, author_color, author_title, ai_first_message, quick_replies, source, source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
   const results = [];
-
   for (let i = 0; i < newItems.length; i++) {
     const item = newItems[i];
     const title = item.title;
@@ -59,7 +56,8 @@ async function processZhihuToCards(items) {
     const tags = tagMap[i] || ['#热点话题'];
     const qr = QUICK_REPLY_TEMPLATES[i % QUICK_REPLY_TEMPLATES.length];
 
-    const result = insertStmt.run(
+    const result = await db.run(
+      `INSERT INTO cards (target_role, tags, heat, title, summary, gradient, author_name, author_avatar, author_color, author_title, ai_first_message, quick_replies, source, source_url) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       'general', JSON.stringify(tags), HEATS[i % HEATS.length],
       title, excerpt, GRADIENTS[i % GRADIENTS.length],
       '知乎热榜', '知', '#3b82f6',

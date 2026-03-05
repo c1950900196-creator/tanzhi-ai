@@ -1,12 +1,12 @@
-const db = require('../db');
+const { db } = require('../db');
 const { getEmbedding } = require('./doubao');
 const { cosineSimilarity } = require('../utils/embedding');
 
 const userEmbCache = new Map();
 const USER_EMB_TTL = 10 * 60 * 1000;
 
-function getTagEmbeddingsMap() {
-  const rows = db.prepare('SELECT name, embedding FROM tag_library WHERE embedding IS NOT NULL').all();
+async function getTagEmbeddingsMap() {
+  const rows = await db.all('SELECT name, embedding FROM tag_library WHERE embedding IS NOT NULL');
   const map = {};
   for (const r of rows) {
     try { map[r.name.toLowerCase()] = JSON.parse(r.embedding); } catch {}
