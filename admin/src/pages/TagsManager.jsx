@@ -52,44 +52,44 @@ export default function TagsManager() {
     setMergeLoading(false);
   };
 
-  if (loading) return <div className="text-center py-10"><Spinner size={24} /></div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: '40px 0' }}><Spinner size={24} /></div>;
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h2 className="text-xl font-semibold">标签库 <span className="text-[#64748b] text-sm font-normal">({total} 个)</span></h2>
-        <button onClick={initTags} disabled={initLoading} className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50 transition-colors">{initLoading ? '初始化中...' : '🔄 从卡片初始化'}</button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <h2 style={{ fontSize: 20, fontWeight: 600 }}>标签库 <span style={{ color: '#64748b', fontSize: 14, fontWeight: 400 }}>({total} 个)</span></h2>
+        <button onClick={initTags} disabled={initLoading} className="btn btn-primary">{initLoading ? '初始化中...' : '🔄 从卡片初始化'}</button>
       </div>
 
       {selected.size > 0 && (
-        <div className="bg-[#1e293b] border border-[#334155] rounded-xl p-4 mb-4 flex items-center gap-3 flex-wrap">
-          <span className="text-[#94a3b8] text-[13px]">已选 {selected.size} 个标签</span>
-          <input type="text" value={mergeTarget} onChange={e => setMergeTarget(e.target.value)} placeholder="合并目标标签名" className="w-48 bg-[#1e293b] text-[#e2e8f0] border border-[#334155] px-3 py-1.5 rounded-lg text-sm outline-none" />
-          <button onClick={mergeTags} disabled={mergeLoading} className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-50">{mergeLoading ? '合并中...' : '🔗 合并标签'}</button>
-          <button onClick={() => setSelected(new Set())} className="px-3 py-1.5 rounded-lg text-sm border border-[#334155] text-[#94a3b8] hover:bg-[#1e293b]">清除选择</button>
+        <div className="stat-card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <span style={{ color: '#94a3b8', fontSize: 13 }}>已选 {selected.size} 个标签</span>
+          <input type="text" value={mergeTarget} onChange={e => setMergeTarget(e.target.value)} placeholder="合并目标标签名" style={{ width: 192 }} />
+          <button onClick={mergeTags} disabled={mergeLoading} className="btn btn-primary" style={{ fontSize: 13, padding: '6px 12px' }}>{mergeLoading ? '合并中...' : '🔗 合并标签'}</button>
+          <button onClick={() => setSelected(new Set())} className="btn btn-ghost" style={{ fontSize: 13, padding: '6px 12px' }}>清除选择</button>
         </div>
       )}
 
-      <div className="bg-[#1e293b] border border-[#334155] rounded-xl overflow-hidden">
-        <table className="w-full border-collapse text-sm">
-          <thead><tr className="text-left text-[#94a3b8] text-[13px] font-medium border-b border-[#334155]">
-            <th className="px-3 py-2.5 w-10"><input type="checkbox" checked={selected.size === tags.length && tags.length > 0} onChange={selectAll} /></th>
-            <th className="px-3 py-2.5 w-12">ID</th><th className="px-3 py-2.5 min-w-[120px]">标签名</th>
-            <th className="px-3 py-2.5 w-20">分类</th><th className="px-3 py-2.5 w-20">使用次数</th>
-            <th className="px-3 py-2.5 w-20">有向量</th><th className="px-3 py-2.5 w-36">创建时间</th><th className="px-3 py-2.5 w-16">操作</th>
+      <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: 12, overflowX: 'auto' }}>
+        <table style={{ minWidth: 700 }}>
+          <thead><tr>
+            <th style={{ width: 40 }}><input type="checkbox" checked={selected.size === tags.length && tags.length > 0} onChange={selectAll} /></th>
+            <th style={{ width: 48 }}>ID</th><th style={{ minWidth: 120 }}>标签名</th>
+            <th style={{ width: 80 }}>分类</th><th style={{ width: 80 }}>使用次数</th>
+            <th style={{ width: 80 }}>有向量</th><th style={{ width: 144 }}>创建时间</th><th style={{ width: 64 }}>操作</th>
           </tr></thead>
           <tbody>
-            {tags.length === 0 ? <tr><td colSpan={8} className="text-center text-[#64748b] py-8">暂无标签</td></tr> :
+            {tags.length === 0 ? <tr><td colSpan={8} style={{ textAlign: 'center', color: '#64748b', padding: '32px 0' }}>暂无标签</td></tr> :
               tags.map(t => (
-                <tr key={t.id} className={`border-b border-[#1e293b] hover:bg-[#1e293b] ${selected.has(t.id) ? 'bg-[#1e3a5f]' : ''}`}>
-                  <td className="px-3 py-2.5"><input type="checkbox" checked={selected.has(t.id)} onChange={() => toggle(t.id)} /></td>
-                  <td className="px-3 py-2.5 text-[#64748b]">{t.id}</td>
-                  <td className="px-3 py-2.5 font-medium"><span className="bg-[#334155] text-[#e2e8f0] px-2.5 py-0.5 rounded-full text-[13px]">#{t.name}</span></td>
-                  <td className="px-3 py-2.5 text-[#94a3b8] text-[13px]">{t.category || '-'}</td>
-                  <td className="px-3 py-2.5"><span className="text-blue-500 font-semibold">{t.usage_count}</span></td>
-                  <td className="px-3 py-2.5">{t.has_embedding !== false ? <span className="text-green-500">✓</span> : <span className="text-red-500">✗</span>}</td>
-                  <td className="px-3 py-2.5 text-xs text-[#94a3b8]">{fmtTime(t.created_at)}</td>
-                  <td className="px-3 py-2.5"><button onClick={() => deleteTag(t.id, t.name)} className="bg-red-600 hover:bg-red-700 text-white text-xs px-2.5 py-1 rounded-md transition-colors">删除</button></td>
+                <tr key={t.id} style={selected.has(t.id) ? { background: '#1e3a5f' } : {}}>
+                  <td><input type="checkbox" checked={selected.has(t.id)} onChange={() => toggle(t.id)} /></td>
+                  <td style={{ color: '#64748b' }}>{t.id}</td>
+                  <td style={{ fontWeight: 500 }}><span className="tag" style={{ fontSize: 13, padding: '2px 10px' }}>#{t.name}</span></td>
+                  <td style={{ color: '#94a3b8', fontSize: 13 }}>{t.category || '-'}</td>
+                  <td><span style={{ color: '#3b82f6', fontWeight: 600 }}>{t.usage_count}</span></td>
+                  <td>{t.has_embedding !== false ? <span style={{ color: '#22c55e' }}>✓</span> : <span style={{ color: '#ef4444' }}>✗</span>}</td>
+                  <td style={{ fontSize: 12, color: '#94a3b8' }}>{fmtTime(t.created_at)}</td>
+                  <td><button onClick={() => deleteTag(t.id, t.name)} className="btn btn-danger">删除</button></td>
                 </tr>
               ))}
           </tbody>

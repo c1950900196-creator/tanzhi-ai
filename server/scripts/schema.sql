@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS cards (
   quick_replies TEXT NOT NULL,
   source VARCHAR(50) DEFAULT 'ai_generated',
   source_url VARCHAR(500),
+  title_embedding LONGTEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
 
@@ -52,6 +53,25 @@ CREATE TABLE IF NOT EXISTS tag_library (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_tags_name (name),
   INDEX idx_tags_usage (usage_count)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS generation_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  type VARCHAR(50) NOT NULL,
+  target_role VARCHAR(50),
+  requested INT DEFAULT 0,
+  kept INT DEFAULT 0,
+  dedup_dropped INT DEFAULT 0,
+  retries INT DEFAULT 0,
+  card_ids TEXT,
+  card_titles TEXT,
+  dropped_titles TEXT,
+  duration_ms INT DEFAULT 0,
+  status VARCHAR(20) DEFAULT 'success',
+  error_msg TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_genlog_type (type),
+  INDEX idx_genlog_created (created_at)
 ) ENGINE=InnoDB;
 
 CREATE INDEX idx_cards_source ON cards(source);

@@ -16,6 +16,7 @@ const adminTagsRoutes = require('./routes/admin/tags');
 const adminRagTestRoutes = require('./routes/admin/ragTest');
 
 const app = express();
+app.set('trust proxy', 1);
 
 app.use(cors({
   origin: config.cors.origins,

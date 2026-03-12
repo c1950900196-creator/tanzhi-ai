@@ -6,10 +6,12 @@ import CardsManager from './pages/CardsManager';
 import UsersManager from './pages/UsersManager';
 import TagsManager from './pages/TagsManager';
 import RagTest from './pages/RagTest';
+import GenerationLogs from './pages/GenerationLogs';
 
 const TABS = [
   { id: 'dashboard', label: '数据看板', icon: '📊' },
   { id: 'cards', label: '卡片管理', icon: '🃏' },
+  { id: 'logs', label: '生成记录', icon: '📋' },
   { id: 'users', label: '用户管理', icon: '👥' },
   { id: 'tags', label: '标签管理', icon: '🏷️' },
   { id: 'rag', label: 'RAG测试', icon: '🔬' }
@@ -33,30 +35,31 @@ export default function App() {
 
   const logout = () => { clearAdminKey(); setAuthed(false); };
 
-  if (checking) return <div className="min-h-screen flex items-center justify-center text-[#64748b]">验证中...</div>;
+  if (checking) return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>验证中...</div>;
   if (!authed) return <Login onLogin={() => setAuthed(true)} />;
 
-  const PageComponent = { dashboard: Dashboard, cards: CardsManager, users: UsersManager, tags: TagsManager, rag: RagTest }[tab] || Dashboard;
+  const PageComponent = { dashboard: Dashboard, cards: CardsManager, logs: GenerationLogs, users: UsersManager, tags: TagsManager, rag: RagTest }[tab] || Dashboard;
 
   return (
-    <div className="min-h-screen">
-      <div className="bg-[#1e293b] border-b border-[#334155] px-5">
-        <div className="max-w-[1200px] mx-auto flex items-center justify-between h-14">
-          <div className="flex items-center gap-6">
-            <div className="text-lg font-bold">探知 Admin</div>
-            <div className="flex gap-1">
+    <div style={{ minHeight: '100vh' }}>
+      <div style={{ background: '#1e293b', borderBottom: '1px solid #334155', padding: '0 20px' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+            <div style={{ fontSize: 18, fontWeight: 700 }}>探知 Admin</div>
+            <div style={{ display: 'flex', gap: 4 }}>
               {TABS.map(t => (
                 <button key={t.id} onClick={() => setTab(t.id)}
-                  className={`px-4 py-2 rounded-lg text-sm flex items-center gap-1.5 transition-all ${tab === t.id ? 'bg-blue-500 text-white' : 'text-[#94a3b8] border border-[#334155] hover:bg-[#1e293b] hover:text-[#e2e8f0]'}`}>
+                  className={tab === t.id ? 'btn btn-primary' : 'btn btn-ghost'}
+                  style={{ fontSize: 14, padding: '6px 14px' }}>
                   {t.icon} {t.label}
                 </button>
               ))}
             </div>
           </div>
-          <button onClick={logout} className="text-[13px] text-[#94a3b8] border border-[#334155] px-3 py-1.5 rounded-lg hover:bg-[#1e293b] hover:text-[#e2e8f0] transition-colors">退出</button>
+          <button onClick={logout} className="btn btn-ghost" style={{ fontSize: 13, padding: '4px 12px' }}>退出</button>
         </div>
       </div>
-      <div className="max-w-[1200px] mx-auto px-5 py-4 pb-10">
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '16px 20px 40px' }}>
         <PageComponent key={tab} />
       </div>
     </div>

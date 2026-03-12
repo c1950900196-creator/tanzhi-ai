@@ -41,7 +41,9 @@ router.post('/', authMiddleware, chatLimiter, async (req, res) => {
 
     const apiMessages = [
       { role: 'system', content: systemPrompt },
-      ...messages.map(m => ({ role: m.role === 'ai' ? 'assistant' : m.role, content: m.content }))
+      ...messages
+        .filter(m => m.role !== 'card')
+        .map(m => ({ role: m.role === 'ai' ? 'assistant' : m.role, content: m.content }))
     ];
 
     res.setHeader('Content-Type', 'text/event-stream');

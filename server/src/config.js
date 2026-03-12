@@ -14,6 +14,12 @@ const config = {
     embeddingUrl: process.env.DOUBAO_EMBEDDING_URL || 'https://ark.cn-beijing.volces.com/api/v3/embeddings/multimodal'
   },
 
+  gemini: {
+    apiKey: process.env.GEMINI_API_KEY,
+    model: process.env.GEMINI_MODEL || 'gemini-3.1-flash-preview',
+    baseUrl: process.env.GEMINI_BASE_URL || 'https://work.poloapi.com/v1/chat/completions'
+  },
+
   db: {
     type: process.env.DB_TYPE || 'sqlite',
     host: process.env.DB_HOST || 'localhost',
@@ -29,7 +35,7 @@ const config = {
   }
 };
 
-const required = ['DOUBAO_API_KEY', 'JWT_SECRET', 'ADMIN_KEY'];
+const required = ['DOUBAO_API_KEY', 'GEMINI_API_KEY', 'JWT_SECRET', 'ADMIN_KEY'];
 for (const key of required) {
   if (!process.env[key]) {
     console.warn(`[配置] 警告: 缺少环境变量 ${key}`);

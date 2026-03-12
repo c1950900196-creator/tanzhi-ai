@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Quote, Star, Share2, ThumbsDown } from 'lucide-react';
 import { api } from '../../api';
 import { MOCK_DATA, DAILY_QUOTES } from '../../data/mockData';
@@ -20,10 +20,25 @@ export default function CardFeed({ userProfile, onOpenChat }) {
   const animFrameRef = useRef(null);
   const trackRef = useRef(null);
   const holdTimerRef = useRef(null);
+  const hasRestored = useRef(false);
+  const pendingReset = useRef(false);
 
   useEffect(() => {
     api.getCards().then(data => {
-      if (data?.length > 0) setCards(data);
+      if (data?.length > 0) {
+        setCards(data);
+        if (!hasRestored.current) {
+          hasRestored.current = true;
+          const lastId = localStorage.getItem('tanzhi_last_card_id');
+          if (lastId) {
+            const lastIdx = data.findIndex(c => String(c.id) === lastId);
+            if (lastIdx >= 0) {
+              const nextIdx = (lastIdx + 1) % data.length;
+              setCurrentIndex(nextIdx);
+            }
+          }
+        }
+      }
     }).catch(e => console.warn('获取卡片失败:', e.message))
       .finally(() => setCardsLoading(false));
   }, []);
@@ -32,11 +47,19 @@ export default function CardFeed({ userProfile, onOpenChat }) {
     if (cardsLoading || !cards[currentIndex]) return;
     const card = cards[currentIndex];
     api.trackEvent(card.id, 'view', card.source);
+    localStorage.setItem('tanzhi_last_card_id', String(card.id));
   }, [currentIndex, cardsLoading]);
 
   const wrapIndex = (i) => ((i % cards.length) + cards.length) % cards.length;
   const getContainerH = () => containerRef.current ? containerRef.current.offsetHeight : 600;
   const setTrackY = (val) => { offsetY.current = val; if (trackRef.current) trackRef.current.style.transform = `translateY(${val}px)`; };
+
+  useLayoutEffect(() => {
+    if (pendingReset.current) {
+      setTrackY(0);
+      pendingReset.current = false;
+    }
+  });
 
   const snapTo = (targetIndex) => {
     setIsSnapping(true);
@@ -53,7 +76,7 @@ export default function CardFeed({ userProfile, onOpenChat }) {
       setTrackY(startVal + (targetY - startVal) * ease);
       if (progress < 1) { animFrameRef.current = requestAnimationFrame(animate); }
       else {
-        setTrackY(0);
+        pendingReset.current = true;
         setCurrentIndex(wrapIndex(targetIndex));
         setIsSnapping(false);
       }
@@ -109,23 +132,26 @@ export default function CardFeed({ userProfile, onOpenChat }) {
 
   const renderCardContent = (card, isCurrent) => (
     <>
-      <div className="absolute inset-0 rounded-3xl overflow-hidden shadow-xl shadow-slate-200/80" style={{ background: card.gradient }}>
-        <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-white/70 to-white/95" />
+      <div className="absolute inset-0 overflow-hidden bg-white">
       </div>
-      <div className="absolute inset-0 p-8 flex flex-col border border-slate-100/50 rounded-3xl" style={{ paddingTop: '10%' }}>
-        <div className="flex items-center space-x-4 mb-8">
-          <div className="w-12 h-12 rounded-full flex items-center justify-center text-white text-base font-bold shadow-md" style={{ backgroundColor: card.author.color }}>{card.author.avatar}</div>
+      <div className="absolute inset-0 p-6 pb-6 flex flex-col" style={{ paddingTop: '8%' }}>
+        <div className="flex items-center space-x-3 mb-6">
+          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white text-base font-semibold shadow-sm" style={{ backgroundColor: card.author.color }}>{card.author.avatar}</div>
           <div>
-            <div className="text-base font-semibold text-slate-800">{card.author.name}</div>
-            <div className="text-xs text-slate-400">{card.author.title}</div>
+            <div className="text-[15px] font-semibold text-[#1D1D1F]">{card.author.name}</div>
+            <div className="text-[13px] text-gray-500">{card.author.title}</div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2.5 mb-6">
-          <span className="px-3 py-1.5 bg-rose-50 text-rose-600 rounded-lg text-xs font-semibold shadow-sm border border-rose-100">{card.heat}</span>
-          {card.tags.map(tag => <span key={tag} className="px-3 py-1.5 text-slate-600 bg-white/60 backdrop-blur-sm rounded-lg text-xs font-medium border border-slate-200">{tag}</span>)}
+        <div className="flex flex-wrap gap-2 mb-5">
+          <span className="px-3 py-1.5 bg-[#FF3B30]/10 text-[#FF3B30] rounded-xl text-[13px] font-semibold">{card.heat}</span>
+          {card.tags.map(tag => <span key={tag} className="px-3 py-1.5 text-gray-600 bg-gray-100/80 rounded-xl text-[13px] font-medium">{tag}</span>)}
         </div>
-        <h2 className="text-3xl font-bold leading-snug mb-5 tracking-tight text-slate-900">{card.title}</h2>
-        <div className="text-slate-500 text-base leading-loose">{isCurrent ? <TypewriterText text={card.summary} /> : null}</div>
+        <h2 className="text-[28px] font-bold leading-tight mb-4 tracking-tight text-[#1D1D1F]">{card.title}</h2>
+        <div className="text-gray-500 text-[17px] leading-relaxed flex-1 overflow-hidden">{isCurrent ? <TypewriterText text={card.summary} /> : null}</div>
+        <div className="pt-3 mt-auto flex items-center justify-center">
+          <Quote size={10} className="mr-1.5 text-gray-300" />
+          <span className="text-[11px] text-gray-400">{currentQuote}</span>
+        </div>
       </div>
     </>
   );
@@ -134,11 +160,17 @@ export default function CardFeed({ userProfile, onOpenChat }) {
   const nextIdx = wrapIndex(currentIndex + 1);
 
   return (
-    <div className="h-screen w-full relative bg-slate-100 overflow-hidden flex flex-col justify-center items-center pb-24" onWheel={handleWheel}>
-      <div className="absolute top-0 left-0 w-full px-5 pt-3 pb-1 flex justify-start items-center z-20 pointer-events-none">
-        <div className="flex items-center space-x-2.5">
-          <img src="/logo.png" alt="探知" style={{ height: '42px', objectFit: 'contain' }} />
-          <span className="font-bold text-xl tracking-wide text-slate-900">探知</span>
+    <div className="h-screen w-full relative bg-[#F2F2F7] overflow-hidden flex flex-col justify-center items-center pb-24" onWheel={handleWheel}>
+      {/* 顶部导航栏，标准 iOS 磨砂玻璃 */}
+      <div className="absolute top-0 left-0 w-full z-20 pointer-events-none">
+        <div className="px-5 pt-[env(safe-area-inset-top,20px)] pb-3 flex justify-between items-center bg-white/70 backdrop-blur-2xl border-b border-gray-200/50">
+          <div className="flex items-center space-x-2.5">
+            <img src="/logo.png" alt="探知" className="w-9 h-9 object-contain" />
+            <span className="font-semibold text-[22px] tracking-tight text-[#1D1D1F]">探知</span>
+          </div>
+          <div className="text-[12px] font-medium text-gray-500 bg-gray-100/80 px-3 py-1.5 rounded-full">
+            点击卡片进行话题讨论
+          </div>
         </div>
       </div>
 
@@ -152,19 +184,12 @@ export default function CardFeed({ userProfile, onOpenChat }) {
       )}
 
       <div ref={containerRef}
-        className="w-full max-w-md h-[78vh] px-4 relative z-10 mt-2 overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        className="w-full max-w-md h-[calc(100vh-140px)] relative z-10 mt-12 overflow-hidden cursor-grab active:cursor-grabbing select-none"
         onMouseDown={handlePointerDown} onTouchStart={handlePointerDown} onClick={handleCardClick}>
         <div ref={trackRef} style={{ position: 'absolute', inset: 0, willChange: 'transform' }}>
           <div style={{ position: 'absolute', left: 0, right: 0, height: '100%', top: 'calc(-100% - 16px)' }}>{renderCardContent(cards[prevIdx], false)}</div>
           <div style={{ position: 'absolute', left: 0, right: 0, height: '100%', top: 0 }}>{renderCardContent(cards[currentIndex], true)}</div>
           <div style={{ position: 'absolute', left: 0, right: 0, height: '100%', top: 'calc(100% + 16px)' }}>{renderCardContent(cards[nextIdx], false)}</div>
-        </div>
-      </div>
-
-      <div className="absolute bottom-[90px] w-full px-8 z-10 flex justify-center pointer-events-none">
-        <div className="text-[11px] font-medium text-slate-400 px-4 py-1.5 flex items-center">
-          <Quote size={10} className="mr-1.5 text-slate-300" />
-          {currentQuote}
         </div>
       </div>
 

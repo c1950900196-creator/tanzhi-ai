@@ -10,7 +10,7 @@ function parseQuestions(text) {
   const qPart = text.slice(firstIdx);
   const questions = qPart.split('[Q]')
     .map(s => s.split('\n')[0].trim())
-    .filter(s => s.length > 0 && s.length <= 30)
+    .filter(s => s.length > 0 && s.length <= 50)
     .slice(0, 3);
   return { body, questions };
 }
@@ -105,7 +105,8 @@ export default function ChatScreen({ card, onBack }) {
     let fullText = '';
     try {
       const cardCtx = card ? { title: card.title, summary: card.summary } : null;
-      await api.chatStream(updatedMsgs, cardCtx, (streamText) => {
+      const chatMsgs = updatedMsgs.filter(m => m.role !== 'card');
+      await api.chatStream(chatMsgs, cardCtx, (streamText) => {
         fullText = streamText;
         const { body } = parseQuestions(streamText);
         setMessages(prev => { const u = [...prev]; u[u.length - 1] = { role: 'ai', content: body }; return u; });
@@ -138,11 +139,11 @@ export default function ChatScreen({ card, onBack }) {
   };
 
   return (
-    <div className="fixed inset-0 w-full bg-slate-50 flex flex-col z-50 animate-slide-up">
-      <div className="glass-panel px-4 py-3 flex items-center justify-between sticky top-0 z-20 border-b border-slate-200">
-        <button onClick={handleEndChat} className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-700"><ChevronDown size={24} /></button>
-        <div className="flex-1 text-center truncate px-4 text-sm font-semibold text-slate-900">{isNewChat ? '新对话' : card.title}</div>
-        <button className="p-2 hover:bg-slate-100 rounded-full transition-colors text-slate-500"><MoreHorizontal size={24} /></button>
+    <div className="fixed inset-0 w-full bg-[#F2F2F7] flex flex-col z-50 animate-slide-up">
+      <div className="px-4 pt-[env(safe-area-inset-top,20px)] pb-3 flex items-center justify-between sticky top-0 z-20 border-b border-gray-200/50 bg-white/80 backdrop-blur-xl">
+        <button onClick={handleEndChat} className="p-2 hover:bg-gray-200/50 rounded-full transition-colors text-[#007AFF]"><ChevronDown size={28} strokeWidth={2.5} /></button>
+        <div className="flex-1 text-center truncate px-4 text-[17px] font-semibold text-[#1D1D1F] tracking-tight">{isNewChat ? '新对话' : card.title}</div>
+        <button className="p-2 hover:bg-gray-200/50 rounded-full transition-colors text-[#007AFF]"><MoreHorizontal size={24} /></button>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6 hide-scrollbar pb-32 chat-scroll-area">
@@ -154,10 +155,10 @@ export default function ChatScreen({ card, onBack }) {
 
           if (msg.role === 'card') {
             return (
-              <div key={idx} className="bg-gradient-to-br from-white to-slate-50 border border-slate-200 rounded-2xl p-5 shadow-sm">
-                <div className="flex items-center gap-2 mb-3"><FileText size={16} className="text-blue-600" /><span className="text-xs font-medium text-blue-600">卡片内容</span></div>
-                {msg.title && <div className="font-semibold text-slate-900 text-base mb-2">{msg.title}</div>}
-                <div className="text-slate-700 text-[14px] leading-relaxed">{msg.content}</div>
+              <div key={idx} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <div className="flex items-center gap-2 mb-3"><FileText size={16} className="text-gray-400" /><span className="text-[13px] font-medium text-gray-500">卡片内容</span></div>
+                {msg.title && <div className="font-semibold text-[#1D1D1F] text-[17px] mb-2 tracking-tight">{msg.title}</div>}
+                <div className="text-gray-500 text-[15px] leading-relaxed">{msg.content}</div>
               </div>
             );
           }
@@ -165,14 +166,14 @@ export default function ChatScreen({ card, onBack }) {
           return (
             <div key={idx}>
               <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl p-4 leading-relaxed text-[15px] shadow-sm ${msg.role === 'user' ? 'bg-slate-900 text-white rounded-tr-sm font-medium' : 'bg-white border border-slate-100 text-slate-800 rounded-tl-sm'}`}>
+                <div className={`max-w-[80%] rounded-[20px] px-4 py-2.5 leading-relaxed text-[16px] ${msg.role === 'user' ? 'bg-[#007AFF] text-white rounded-br-[4px]' : 'bg-white shadow-[0_2px_8px_rgba(0,0,0,0.04)] text-[#1D1D1F] border border-gray-100 rounded-bl-[4px]'}`}>
                   {msg.role === 'ai' ? <MarkdownText text={msg.content} /> : msg.content}
                 </div>
               </div>
               {qsList.length > 0 && (
                 <div className="flex flex-col gap-2 mt-3 ml-1">
                   {qsList.map(q => (
-                    <button key={q} onClick={() => handleSend(q)} className="text-left px-3 py-2 bg-white border border-slate-200 rounded-xl text-sm text-slate-600 hover:border-blue-600 hover:text-blue-600 shadow-sm transition-colors w-fit max-w-[85%]">{q}</button>
+                    <button key={q} onClick={() => handleSend(q)} className="text-left px-4 py-2.5 bg-white/50 backdrop-blur-md border border-[#007AFF]/30 rounded-2xl text-[15px] text-[#007AFF] hover:bg-[#007AFF]/10 shadow-sm transition-colors w-fit max-w-[85%]">{q}</button>
                   ))}
                 </div>
               )}
@@ -181,34 +182,34 @@ export default function ChatScreen({ card, onBack }) {
         })}
         {isTyping && !isStreaming && (
           <div className="flex justify-start">
-            <div className="bg-white border border-slate-100 rounded-2xl rounded-tl-sm p-4 flex space-x-2 w-16 justify-center shadow-sm">
-              <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-              <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-              <div className="w-2 h-2 bg-slate-300 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+            <div className="bg-white border border-gray-100 rounded-[20px] rounded-bl-[4px] px-4 py-3 flex items-center space-x-1.5 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+              <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="absolute bottom-0 w-full glass-panel border-t border-slate-200 p-4 pb-8 z-20">
+      <div className="absolute bottom-0 w-full border-t border-gray-200/50 bg-white/80 backdrop-blur-xl px-4 py-3 pb-safe z-20">
         {isStreaming && (
           <div className="flex justify-center mb-3">
-            <button onClick={() => abortRef.current?.abort()} className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 rounded-full text-sm text-slate-600 hover:bg-slate-50 hover:border-slate-400 shadow-sm transition-all">
-              <Square size={14} className="fill-current" /> 停止生成
+            <button onClick={() => abortRef.current?.abort()} className="flex items-center gap-2 px-4 py-1.5 bg-white border border-gray-200 rounded-full text-[13px] text-gray-500 shadow-sm transition-all">
+              <Square size={12} className="fill-current" /> 停止生成
             </button>
           </div>
         )}
         <div className="flex items-end gap-2 max-w-3xl mx-auto">
-          <div className="flex-1 bg-white border border-slate-200 shadow-sm rounded-2xl p-1 flex items-center transition-colors focus-within:border-blue-600">
+          <div className="flex-1 bg-white border border-gray-200 shadow-sm rounded-full flex items-center transition-colors focus-within:border-[#007AFF]">
             <input type="text" value={inputValue} onChange={e => setInputValue(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && !isStreaming && handleSend(inputValue)}
-              placeholder="输入你的想法或疑问..." disabled={isStreaming}
-              className="w-full bg-transparent border-none outline-none px-4 py-3 text-slate-900 placeholder-slate-400 disabled:opacity-50" />
+              placeholder="iMessage" disabled={isStreaming}
+              className="w-full bg-transparent border-none outline-none px-4 py-2 text-[#1D1D1F] placeholder-gray-400 disabled:opacity-50 text-[16px]" />
           </div>
           <button onClick={() => handleSend(inputValue)} disabled={!inputValue.trim() || isStreaming}
-            className={`p-4 rounded-2xl flex items-center justify-center transition-all ${inputValue.trim() && !isStreaming ? 'bg-slate-900 text-white hover:bg-slate-800 shadow-md' : 'bg-slate-100 text-slate-400'}`}>
-            <Send size={20} />
+            className={`w-9 h-9 mb-0.5 rounded-full flex items-center justify-center transition-all flex-shrink-0 ${inputValue.trim() && !isStreaming ? 'bg-[#007AFF] text-white hover:scale-105 active:scale-95' : 'bg-gray-100 text-gray-400'}`}>
+            <Send size={16} className="ml-0.5" />
           </button>
         </div>
       </div>

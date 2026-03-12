@@ -1,7 +1,7 @@
 const { Router } = require('express');
 const { db } = require('../../db');
 const adminAuth = require('../../middleware/admin');
-const { generateCards } = require('../../services/cardGenerator');
+const { generateCards, dailyGenerate } = require('../../services/cardGenerator');
 const { fetchZhihuHot, processZhihuToCards } = require('../../services/zhihuCrawler');
 
 const router = Router();
@@ -16,22 +16,52 @@ router.post('/generate-cards', adminAuth, async (req, res) => {
     res.json({ success: true, count: results.length, cards: results });
   } catch (e) {
     console.error('生成卡片失败:', e.message);
+    try {
+      await db.run(
+        `INSERT INTO generation_logs (type, target_role, requested, status, error_msg) VALUES (?,?,?,?,?)`,
+        'ai_generate', req.body.role || 'developer', 6, 'failed', e.message
+      );
+    } catch (_) {}
     res.status(500).json({ error: '生成卡片失败: ' + e.message });
   }
 });
 
 router.post('/fetch-zhihu', adminAuth, async (req, res) => {
+  const startTime = Date.now();
   try {
     console.log('[知乎] 开始爬取热榜...');
     const items = await fetchZhihuHot();
     console.log(`[知乎] 获取到 ${items.length} 条热榜`);
     const cards = await processZhihuToCards(items);
     console.log(`[知乎] 成功生成 ${cards.length} 张卡片`);
+    const durationMs = Date.now() - startTime;
+    try {
+      await db.run(
+        `INSERT INTO generation_logs (type, requested, kept, dedup_dropped, card_ids, card_titles, duration_ms, status) VALUES (?,?,?,?,?,?,?,?)`,
+        'zhihu_crawl', items.length, cards.length, items.length - cards.length,
+        JSON.stringify(cards.map(c => c.id)),
+        JSON.stringify(cards.map(c => c.title)),
+        durationMs, 'success'
+      );
+    } catch (_) {}
     res.json({ success: true, fetched: items.length, newCards: cards.length, cards });
   } catch (e) {
     console.error('[知乎] 失败:', e.message);
+    try {
+      await db.run(
+        `INSERT INTO generation_logs (type, status, error_msg, duration_ms) VALUES (?,?,?,?)`,
+        'zhihu_crawl', 'failed', e.message, Date.now() - startTime
+      );
+    } catch (_) {}
     res.status(500).json({ error: e.message });
   }
+});
+
+router.post('/daily-generate', adminAuth, async (req, res) => {
+  res.json({ success: true, message: '每日生成任务已启动，请在生成记录中查看进度' });
+  dailyGenerate().catch(e => {
+    console.error('[每日生成] 手动触发失败:', e.message);
+  });
 });
 
 router.get('/cards-stats', adminAuth, async (req, res) => {
@@ -63,6 +93,30 @@ router.get('/cards', adminAuth, async (req, res) => {
       source: c.source || 'ai_generated', source_url: c.source_url,
       author_name: c.author_name, author_title: c.author_title,
       created_at: c.created_at
+    })),
+    pagination: { page, limit, total: total.c, totalPages: Math.ceil(total.c / limit) }
+  });
+});
+
+router.get('/generation-logs', adminAuth, async (req, res) => {
+  const page = Math.max(1, parseInt(req.query.page) || 1);
+  const limit = Math.min(50, Math.max(1, parseInt(req.query.limit) || 20));
+  const offset = (page - 1) * limit;
+  const { type } = req.query;
+
+  let where = '1=1';
+  const params = [];
+  if (type) { where += ' AND type = ?'; params.push(type); }
+
+  const total = await db.get(`SELECT count(*) as c FROM generation_logs WHERE ${where}`, ...params);
+  const logs = await db.all(`SELECT * FROM generation_logs WHERE ${where} ORDER BY created_at DESC LIMIT ? OFFSET ?`, ...params, limit, offset);
+
+  res.json({
+    logs: logs.map(l => ({
+      ...l,
+      card_ids: JSON.parse(l.card_ids || '[]'),
+      card_titles: JSON.parse(l.card_titles || '[]'),
+      dropped_titles: JSON.parse(l.dropped_titles || '[]')
     })),
     pagination: { page, limit, total: total.c, totalPages: Math.ceil(total.c / limit) }
   });

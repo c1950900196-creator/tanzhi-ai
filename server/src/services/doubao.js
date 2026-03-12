@@ -46,6 +46,30 @@ async function getEmbeddingsBatch(texts) {
   return results;
 }
 
+async function callDoubaoWithSearch(messages, temperature = 0.8) {
+  const body = {
+    model: config.doubao.model,
+    messages,
+    temperature,
+    tools: [{ type: 'web_search', web_search: { enable: true } }]
+  };
+  const res = await fetch(config.doubao.baseUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.doubao.apiKey}`
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(60000)
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`豆包联网搜索 API 错误: ${res.status} ${err}`);
+  }
+  const data = await res.json();
+  return data.choices[0].message.content;
+}
+
 async function streamChat(messages, res, abortSignal) {
   const upstream = await fetch(config.doubao.baseUrl, {
     method: 'POST',
@@ -70,4 +94,4 @@ async function streamChat(messages, res, abortSignal) {
   return upstream;
 }
 
-module.exports = { callDoubao, getEmbedding, getEmbeddingsBatch, streamChat, parseJsonResponse };
+module.exports = { callDoubao, callDoubaoWithSearch, getEmbedding, getEmbeddingsBatch, streamChat, parseJsonResponse };
