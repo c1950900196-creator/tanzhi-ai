@@ -54,3 +54,7 @@ cd admin && npm run dev       # 管理端
 ## 许可
 
 MIT
+
+## 支持项目
+
+如果你认可这个方向，欢迎给仓库一个 Star ⭐，也欢迎提 Issue 一起打磨。
