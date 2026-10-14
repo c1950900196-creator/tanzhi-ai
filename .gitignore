@@ -5,3 +5,21 @@ dist/
 server/data/
 *.log
 .DS_Store
+
+# Private runtime data and local build outputs
+.env
+.env.*
+!.env.example
+.DS_Store
+__pycache__/
+*.pyc
+node_modules/
+.venv/
+.local/
+*.log
+xcuserdata/
+*.xcuserstate
+project.private.config.json
+archive-output/
+sample-mail/
+sessions.json

@@ -1,60 +1,41 @@
-# 探知 - AI 认知探索平台
+![探知](assets/github-cover.svg)
 
-> 一个面向程序员和产品经理的 AI 认知探索工具，通过卡片流 + AI 对话的方式，帮助用户发现和理解新技术趋势与产品思维。
+# 探知 · Tanzhi AI
 
-## 功能亮点
+面向产品经理和程序员的 AI 认知探索平台：从一张知识卡片发现问题，再通过 AI 对话深入理解。
 
-- **卡片流浏览** — 类似 Tinder 的上下滑动交互，浏览 AI 生成的认知卡片
-- **AI 对话** — 点击感兴趣的卡片，与 AI 深入讨论
-- **个性化推荐** — 基于用户角色（程序员/产品经理）和兴趣标签推荐内容
-- **智能去重** — 通过 Embedding 余弦相似度避免重复内容
-- **管理后台** — 数据看板、卡片管理、用户管理、标签管理
+**React 19 · Vite · Node.js / Express · MySQL · 豆包 API**
 
-## 技术栈
+## 产品路径
 
-| 模块 | 技术 |
-|------|------|
-| 前端（用户端） | React 19 + Vite 7 + TailwindCSS 4 |
-| 前端（管理端） | React 19 + Vite 7 + TailwindCSS 4 |
-| 后端 | Node.js + Express + MySQL |
-| AI 能力 | 豆包 API（对话、Embedding、Web Search） |
-| 部署 | Nginx + PM2 |
+选择角色与兴趣 → 浏览知识卡片 → 围绕卡片展开讨论
 
-## 项目结构
+- 用户端：兴趣引导、卡片流、AI 讨论和个人页。
+- 管理端：卡片、用户、标签、生成日志与检索调试。
+- 服务端：身份认证、内容推荐、模型接口与向量去重。
 
-```
-tanzhi/
-├── client/          # 用户端前端
-├── admin/           # 管理后台前端
-├── server/          # 后端 API 服务
-└── nginx/           # Nginx 配置
+## 架构
+
+```text
+React 用户端 ─┐
+             ├─ Express API ─ MySQL
+React 管理端 ─┘       └────── 豆包对话 / Embedding
 ```
 
-## 快速开始
+## 本地运行
 
-```bash
-# 1. 安装依赖
-cd server && npm install
-cd ../client && npm install
-cd ../admin && npm install
+需要 Node.js、MySQL 和自己的模型服务配置。分别在 `client`、`admin`、`server` 运行 `npm ci`，按 [安装说明](docs/SETUP.md) 准备隔离数据库与环境变量，再启动三个服务。
 
-# 2. 配置环境变量
-cp server/.env.example server/.env
-# 编辑 .env 填入你的豆包 API Key 等配置
+数据库初始化脚本会写入所连接的数据库；请仅使用自己的本地测试库。示例配置不是可用账号或密钥。
 
-# 3. 初始化数据库
-mysql -u root < server/scripts/schema.sql
+## 版本边界
 
-# 4. 启动服务
-cd server && npm start        # 后端
-cd client && npm run dev      # 用户端
-cd admin && npm run dev       # 管理端
-```
+本仓库展示已公开的基础版本。本地仍在迭代的手记、版本冲突、内容发布审核等能力尚未合并到这个公开版本；README 不将这些能力视为已经交付。
 
-## 许可
+本次 GitHub 整理保留已有应用代码与提交历史，更新项目介绍、展示资源和复现说明，不进行线上部署。模型质量、真实账号流程与数据库联调需要单独验收。
 
-MIT
+→ [系统地图](SYSTEM-MAP.md) · [发布检查](docs/PUBLISH-CHECKS.md)
 
-## 支持项目
+## License
 
-如果你认可这个方向，欢迎给仓库一个 Star ⭐，也欢迎提 Issue 一起打磨。
+[MIT](LICENSE)
